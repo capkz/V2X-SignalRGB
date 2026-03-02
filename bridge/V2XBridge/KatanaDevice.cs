@@ -69,6 +69,22 @@ public sealed class KatanaDevice : IDisposable
         // Drain any buffered data
         _port!.DiscardInBuffer();
 
+        // Probe: send a binary ping to check if device is already in command mode.
+        // When already authenticated (e.g. device retained state after reboot), it
+        // responds with 0x5A header — in that case skip the text challenge-response.
+        byte[] pingProbe = [0x5A, 0x03, 0x00];
+        _port.Write(pingProbe, 0, pingProbe.Length);
+        await Task.Delay(100, ct);
+
+        if (_port.BytesToRead > 0 && _port.ReadByte() == 0x5A)
+        {
+            _log.LogInformation("Device already in binary command mode, skipping auth");
+            _port.DiscardInBuffer();
+            return;
+        }
+
+        _port.DiscardInBuffer();
+
         // Send "whoareyou\r\n" to request a challenge (or check if already authed)
         WriteLine("whoareyou");
         await Task.Delay(50, ct);
