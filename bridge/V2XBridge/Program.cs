@@ -16,18 +16,10 @@ if (args.Length > 0)
     }
 }
 
-// Running interactively (not as a service) — guide the user.
+// Running interactively with no args — double-click install flow.
 if (Environment.UserInteractive)
 {
-    Console.WriteLine($"""
-        V2XBridge — Katana V2X SignalRGB Bridge
-
-        Usage:
-          V2XBridge.exe --install     Install and start the Windows service
-          V2XBridge.exe --uninstall   Stop and remove the Windows service
-
-        The service must be running for the SignalRGB plugin to detect your device.
-        """);
+    Install();
     return;
 }
 
@@ -60,6 +52,8 @@ static void Install()
     RunSc($"start {ServiceName}");
 
     Console.WriteLine($"Service '{ServiceName}' installed and started.");
+    Console.WriteLine("Press any key to close...");
+    Console.ReadKey();
 }
 
 static void Uninstall()
