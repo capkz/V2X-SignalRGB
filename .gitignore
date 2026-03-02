@@ -1,0 +1,20 @@
+# .NET build output
+bridge/**/bin/
+bridge/**/obj/
+
+# Test dependencies
+test/node_modules/
+test/package-lock.json
+
+# Claude Code local settings
+.claude/
+
+# VS / Rider
+*.user
+.vs/
+.idea/
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store
