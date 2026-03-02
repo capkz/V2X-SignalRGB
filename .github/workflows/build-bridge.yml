@@ -1,0 +1,33 @@
+name: Build V2XBridge.exe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bridge/**'
+      - '.github/workflows/build-bridge.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish self-contained exe
+        run: dotnet publish bridge/V2XBridge/V2XBridge.csproj /p:PublishProfile=Release
+
+      - name: Commit V2XBridge.exe
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add V2XBridge.exe
+          git diff --staged --quiet && echo "No changes to commit" || (git commit -m "ci: build V2XBridge.exe [skip ci]" && git push)
