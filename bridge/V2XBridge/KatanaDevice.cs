@@ -66,45 +66,64 @@ public sealed class KatanaDevice : IDisposable
 
     private async Task AuthenticateAsync(CancellationToken ct)
     {
-        // Drain any buffered data
         _port!.DiscardInBuffer();
 
-        // Probe: send a binary ping to check if device is already in command mode.
-        // When already authenticated (e.g. device retained state after reboot), it
-        // responds with 0x5A header — in that case skip the text challenge-response.
-        byte[] pingProbe = [0x5A, 0x03, 0x00];
-        _port.Write(pingProbe, 0, pingProbe.Length);
-        await Task.Delay(100, ct);
-
-        if (_port.BytesToRead > 0 && _port.ReadByte() == 0x5A)
-        {
-            _log.LogInformation("Device already in binary command mode, skipping auth");
-            _port.DiscardInBuffer();
-            return;
-        }
-
-        _port.DiscardInBuffer();
-
-        // Send "whoareyou\r\n" to request a challenge (or check if already authed)
+        // Send "whoareyou" first — this is safe in both text and binary mode.
+        // Sending a binary ping BEFORE this would corrupt the device's text-mode
+        // parser (the bytes get prepended to the next command), breaking auth.
+        _port.ReadTimeout = 1000; // short probe timeout
         WriteLine("whoareyou");
         await Task.Delay(50, ct);
 
-        string response = ReadLine();
+        string? probe = null;
+        try   { probe = ReadLine(); }
+        catch (TimeoutException) { /* handled below */ }
+        finally { _port.ReadTimeout = 3000; }
 
-        if (response.StartsWith("Unknown command", StringComparison.Ordinal) ||
-            response.StartsWith("unlock_OK",       StringComparison.Ordinal))
+        if (probe is not null)
         {
-            _log.LogInformation("Device already authenticated");
-            return;
+            // Binary mode: device responded with binary data (0x5A header byte)
+            if (probe.Length > 0 && (byte)probe[0] == 0x5A)
+            {
+                _log.LogInformation("Device already in binary command mode, skipping auth");
+                _port.DiscardInBuffer();
+                return;
+            }
+
+            if (probe.StartsWith("Unknown command", StringComparison.Ordinal) ||
+                probe.StartsWith("unlock_OK",       StringComparison.Ordinal))
+            {
+                _log.LogInformation("Device already authenticated");
+                return;
+            }
+
+            if (!probe.StartsWith("whoareyou", StringComparison.Ordinal))
+                throw new InvalidOperationException($"Unexpected auth response: {probe}");
         }
-
-        if (!response.StartsWith("whoareyou", StringComparison.Ordinal))
+        else
         {
-            throw new InvalidOperationException($"Unexpected auth response: {response}");
+            // No text response in 1s — try binary ping as fallback
+            _port.DiscardInBuffer();
+            byte[] ping = [0x5A, 0x03, 0x00];
+            _port.Write(ping, 0, ping.Length);
+            await Task.Delay(500, ct);
+
+            if (_port.BytesToRead > 0 && _port.ReadByte() == 0x5A)
+            {
+                _log.LogInformation("Device already in binary command mode (silent to text), skipping auth");
+                _port.DiscardInBuffer();
+                return;
+            }
+
+            // Device still not responding — re-send whoareyou with full 3s timeout
+            _port.DiscardInBuffer();
+            WriteLine("whoareyou");
+            await Task.Delay(50, ct);
+            probe = ReadLine(); // throws TimeoutException if truly unresponsive
         }
 
         // Parse challenge: "whoareyou" [h0 h1] [p0 p1] [32-byte nonce]
-        byte[] challengeBytes = Encoding.Latin1.GetBytes(response.TrimEnd('\r', '\n'));
+        byte[] challengeBytes = Encoding.Latin1.GetBytes(probe.TrimEnd('\r', '\n'));
         if (challengeBytes.Length < 45)
             throw new InvalidOperationException("Challenge packet too short");
 
