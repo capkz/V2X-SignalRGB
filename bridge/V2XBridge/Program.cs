@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.Hosting;
 using V2XBridge;
 
 const string ServiceName        = "V2XBridge";
@@ -18,7 +17,7 @@ if (args.Length > 0)
 }
 
 // Running interactively (not as a service) — guide the user.
-if (!WindowsServiceHelpers.IsWindowsService())
+if (Environment.UserInteractive)
 {
     Console.WriteLine($"""
         V2XBridge — Katana V2X SignalRGB Bridge
