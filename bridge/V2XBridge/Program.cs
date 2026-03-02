@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.ServiceProcess;
+using Microsoft.Extensions.Hosting;
 using V2XBridge;
 
 const string ServiceName        = "V2XBridge";
