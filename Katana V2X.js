@@ -80,42 +80,23 @@ export function ControllableParameters() {
 
 export function DiscoveryService() {
     this.IconUrl = "https://m.media-amazon.com/images/I/41sssrRamoL._AC_UF894,1000_QL80_.jpg";
-    this.UdpBroadcastPort    = 12346; // bridge listens here
-    this.UdpListenPort       = 12347; // plugin listens here
-    this.UdpBroadcastAddress = "127.0.0.1";
 
     this.Initialize = function() {
         service.log("Katana V2X: DiscoveryService initialized");
     };
 
     this.Update = function() {
-        service.broadcast("Creative Bridge Plugin\nDEVICES");
-    };
-
-    // Called when a UDP response arrives on UdpListenPort
-    this.Discovered = function(value) {
-        // Expected response format:
-        // "Creative SignalRGB Service\nDEVICES\nKatanaV2X,Katana V2X,<UUID>\n"
-        const lines = value.response.split("\n");
-
-        if (lines.length < 3) return;
-        if (lines[0].trim() !== "Creative SignalRGB Service") return;
-        if (lines[1].trim() !== "DEVICES") return;
-
-        for (let i = 2; i < lines.length; i++) {
-            const parts = lines[i].trim().split(",");
-            if (parts.length < 3) continue;
-
-            const controllerObj = {
-                type: parts[0].trim(),
-                name: parts[1].trim(),
-                id:   parts[2].trim(),
-                ip:   value.ip,
-                port: this.UdpBroadcastPort,
+        // Bridge is always at 127.0.0.1:12346 — add controller once if not already present.
+        if (service.getController("katana-v2x-0001") === undefined) {
+            service.log("Katana V2X: adding controller");
+            const ctrl = {
+                id:   "katana-v2x-0001",
+                name: "Katana V2X",
+                ip:   "127.0.0.1",
+                port: 12346,
             };
-
-            service.log(`Katana V2X: discovered ${controllerObj.name} (${controllerObj.id})`);
-            service.announceController(controllerObj);
+            service.addController(ctrl);
+            service.announceController(ctrl);
         }
     };
 }
