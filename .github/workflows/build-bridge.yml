@@ -2,7 +2,7 @@ name: Build V2XBridge.exe
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'bridge/**'
       - '.github/workflows/build-bridge.yml'
